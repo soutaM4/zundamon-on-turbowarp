@@ -1,1 +1,4 @@
-# -on-turbowarp
+# ずんだもん on turbowarp v1.0
+ずんだもんボイスをturbowarpで使えるようにする拡張機能です。
+
+これを使っていろいろ作って下さい！
