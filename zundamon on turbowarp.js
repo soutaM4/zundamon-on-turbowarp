@@ -18,7 +18,10 @@ class ZundamonSushiApiWithCache {
         this.currentSourceNode = null;
 
         try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                this.audioContext = new AudioCtx();
+            }
         } catch (e) {
             console.error('Web Audio APIがサポートされていません。', e);
         }
@@ -28,10 +31,21 @@ class ZundamonSushiApiWithCache {
     // 2. 拡張機能メタデータ
     // ----------------------------------------------------
     getInfo() {
+        // アイコン右側の余計な要素（ゴミ）を除去したクリーンな吹き出しSVG
+        const svgIcon = `<svg width="40" height="40" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+            <rect width="512" height="512" rx="100" fill="#26A65B"/>
+            <path d="M410.871,280.932c0-82.909-80.457-150.119-179.702-150.119c-99.256,0-179.712,67.21-179.712,150.119c0,50.111,29.387,94.27,74.721,121.758c-8.91,28.847-28.533,52.269-28.843,52.63c-3.193,3.712-3.81,9.022-1.546,13.338c2.263,4.316,6.73,7.032,11.603,7.032c43.642,0,81.428-21.362,106.311-38.314c5.78,0.85,11.664,1.3,17.466,1.3C330.414,431.051,410.871,363.841,410.871,280.932z" fill="#FFFFFF"/>
+        </svg>`;
+        const iconURI = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
+
         return {
             id: 'zundamonsushicache',
             name: 'ずんだもん音声合成(キャッシュ)',
-            blockIconURI: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIyMCIgZmlsbD0iIzI2QTZEMiIvPgogIDxwYXRoIGQ9MTE4LjQxMSA5LjEwNmwtMS4yMzEgNC4yNDgtNi43NTIgMy4zMjNMIDE1LjEgMTcuNTc1bC0yLjI5MiA1LjgyNCA0Ljc1LS4wOTcgMS44MDcgNS4zMDcgMy4xMTgtMi4wMDgtMS41ODQtNi43MThjLTMuNTgyLTEuMDg4LTIuNTI2LTYuNzctLjczOC03LjIyIDEuMDMtLjI0NiAzLjcyNC4wOSA0LjUwMiAyLjM2TDI4IDkuNTg3bC05LjU4OS0wLjQ4MXptNC41NTMgOC4wMThjLjE3NS0uMjU2LjYzNy0uMTI3LjY5OC4xNWMuMDI5LjE3Mi0wLjE2Ni40Mi0wLjQyMi4zNzEtMC4yODQtMC4wNTItMC4zNjYtMC4yNzUtMC4yNzYtMC41Yy4wMzItMC4wNzIuMDk5LTAuMDQ0LjE1Mi0wLjAyMXptMS4wNSAxLjUyOWMuMzczLjU2LjM5NyAxLjQzOC0wLjA2MSAxLjk2OC0wLjQyOS40ODktMS4yMDUuNjEyLTEuNjk4LjMxNC0wLjYwNi0wLjM2Mi0wLjc2LTEuMTA2LTAuNDA0LTEuNzEyLjMwNi0wLjUyLjkyNC0wLjc2IDEuNTE0LTAuMzl6IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==',
+            blockColor1: '#26A65B', // ブロック本体 (ずんだグリーン)
+            blockColor2: '#1E824C', // 枠線・入力欄
+            blockColor3: '#145A32', // ドロップダウンなどの暗い色
+            blockIconURI: iconURI,
+            menuIconURI: iconURI,
             blocks: [
                 {
                     opcode: 'setApiKey',
@@ -45,19 +59,23 @@ class ZundamonSushiApiWithCache {
                     }
                 },
                 {
+                    opcode: 'getApiKey',
+                    blockType: Scratch.BlockType.REPORTER,
+                    text: 'APIキー'
+                },
+                {
                     opcode: 'setSpeakerId',
                     blockType: Scratch.BlockType.COMMAND,
                     text: 'ずんだもん (四国めたん) の声優IDを [ID] に設定する',
                     arguments: {
                         ID: {
                             type: Scratch.ArgumentType.NUMBER,
-                            defaultValue: this.speakerId,
+                            defaultValue: 3,
                             menu: 'speaker_id_menu'
                         }
                     }
                 },
                 {
-                    // 以前のspeakTextブロックをキャッシュ対応版に置き換えます
                     opcode: 'speakText',
                     blockType: Scratch.BlockType.COMMAND,
                     text: '[TEXT] セリフを保存・再生する',
@@ -85,12 +103,16 @@ class ZundamonSushiApiWithCache {
     }
 
     // ----------------------------------------------------
-    // 3. ブロック処理の実装 (API設定は変更なし)
+    // 3. ブロック処理の実装
     // ----------------------------------------------------
     
     setApiKey(args) {
-        this.apiKey = args.KEY;
-        console.log('APIキーを設定しました。（表示は省略）');
+        this.apiKey = String(args.KEY || '');
+        console.log('APIキーを設定しました。');
+    }
+
+    getApiKey() {
+        return this.apiKey || '';
     }
 
     setSpeakerId(args) {
@@ -109,9 +131,12 @@ class ZundamonSushiApiWithCache {
             return;
         }
 
-        // 既存の再生を停止
         if (this.currentSourceNode) {
-            this.currentSourceNode.stop();
+            try {
+                this.currentSourceNode.stop();
+            } catch (e) {
+                // 無視
+            }
             this.currentSourceNode = null;
         }
         
@@ -132,8 +157,8 @@ class ZundamonSushiApiWithCache {
      * キャッシュに存在する場合は即時再生します。
      */
     async speakText(args) {
-        const text = args.TEXT;
-        const cacheKey = `${text}_${this.speakerId}`; // テキストと話者IDの組み合わせをキーとする
+        const text = String(args.TEXT || '');
+        const cacheKey = `${text}_${this.speakerId}`;
 
         if (!this.audioContext) {
             console.error('Web Audio APIが利用できません。');
@@ -152,7 +177,6 @@ class ZundamonSushiApiWithCache {
         if (this.audioCache.has(cacheKey)) {
             console.log(`✅ キャッシュヒット: 「${text}」を瞬時に再生します。`);
             
-            // キャッシュの値がPromiseの場合は解決を待つ (同じ言葉を連続で呼び出した場合に対応)
             let cachedData = this.audioCache.get(cacheKey);
             if (cachedData instanceof Promise) {
                 cachedData = await cachedData;
@@ -166,20 +190,17 @@ class ZundamonSushiApiWithCache {
         // 2. キャッシュミス（APIリクエスト）
         // ------------------------------------
         
-        // 合成処理のPromiseを一時的にキャッシュに保存
         const synthesisPromise = this._fetchAndDecodeAudio(text, this.speakerId);
         this.audioCache.set(cacheKey, synthesisPromise);
 
         let audioBuffer;
         try {
             audioBuffer = await synthesisPromise;
-            // 成功したらPromiseの結果(AudioBuffer)でキャッシュを更新
             this.audioCache.set(cacheKey, audioBuffer); 
             
             this.playAudioBuffer(audioBuffer, text);
 
         } catch (error) {
-            // エラーが発生したらキャッシュから削除
             this.audioCache.delete(cacheKey); 
             alert(`音声合成エラー: ${error.message}`);
             console.error('音声合成エラー:', error);
@@ -197,7 +218,6 @@ class ZundamonSushiApiWithCache {
         console.log(`➡️ APIリクエスト: 「${text}」の音声合成を開始します。`);
         const encodedText = encodeURIComponent(text);
         
-        // APIキーとパラメータをクエリ文字列として構築
         const fullUrl = `${this.apiUrl}?text=${encodedText}&key=${this.apiKey}&speaker=${speakerId}`;
 
         let synthesisResponse;
@@ -222,7 +242,6 @@ class ZundamonSushiApiWithCache {
 
         const audioData = await synthesisResponse.arrayBuffer();
         
-        // AudioBufferへのデコードは非同期処理
         try {
             return await this.audioContext.decodeAudioData(audioData);
         } catch (e) {
